@@ -1,5 +1,5 @@
 // Offline cache for the program page: serve from cache at once, refresh in the background.
-const CACHE = "vhroda26-ddc9ac69";
+const CACHE = "vhroda26-d7ff5f83";
 const FILES = ["./", "./index.html", "./abstracts.json"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {
