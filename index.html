@@ -142,6 +142,43 @@ mark { background: var(--star-soft); color: inherit; border-radius: 2px; }
 .btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 12px; font-size: 13.5px; cursor: pointer; }
 .btn.danger { color: var(--warn); }
 .it.clash { background: var(--warn-soft); }
+/* rendering cost: skip off-screen blocks */
+.cols > .block, .theme + .card { content-visibility: auto; contain-intrinsic-size: auto 420px; }
+.lk.abs { background: var(--accent-soft); border-color: transparent; color: var(--accent); cursor: pointer; font: inherit; font-size: 13.5px; font-weight: 700; }
+.lk.abs::before { content: ""; width: 14px; height: 14px; background: currentColor; -webkit-mask: var(--doc) center/contain no-repeat; mask: var(--doc) center/contain no-repeat; }
+:root { --doc: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 2h8l5 5v15H6z M8 11h9v1.6H8z M8 14.5h9v1.6H8z M8 18h6v1.6H8z' fill='black' fill-rule='evenodd'/%3E%3C/svg%3E"); }
+.lk.pdf.small { font-weight: 500; color: var(--muted); }
+
+/* abstract reader */
+.reader { position: fixed; inset: 0; z-index: 50; display: flex; justify-content: center; align-items: flex-end; background: rgba(0,0,0,.45); }
+.sheet {
+  background: var(--surface); width: 100%; max-width: 760px; height: 100%; display: flex; flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@media (min-width: 640px) { .reader { align-items: center; padding: 24px; } .sheet { height: auto; max-height: 92vh; border-radius: 14px; } }
+.r-top {
+  display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 6px; border-bottom: 1px solid var(--line);
+  padding-top: max(8px, env(safe-area-inset-top));
+}
+.r-top .grow { flex: 1; }
+.ib { width: 44px; height: 44px; border: 0; background: none; border-radius: 10px; font-size: 20px; cursor: pointer; color: var(--text); display: grid; place-items: center; }
+.ib:disabled { color: var(--line); }
+.r-pos { font-size: 12.5px; color: var(--faint); font-variant-numeric: tabular-nums; min-width: 44px; text-align: center; }
+.r-body { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 16px 18px 28px; }
+.r-meta { font-size: 12.5px; color: var(--accent); font-weight: 700; }
+.r-title { font-size: 20px; line-height: 1.35; margin: 4px 0 0; letter-spacing: -.01em; }
+.r-pt { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.r-auth { font-size: 14px; margin-top: 12px; line-height: 1.55; }
+.r-aff { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.55; }
+.r-text { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 14px; font-size: 16px; line-height: 1.7; word-break: normal; overflow-wrap: break-word; hyphens: auto; }
+.r-text p { margin: 0 0 14px; }
+.r-text ul { margin: 0 0 14px; padding-left: 20px; }
+.r-text li { margin-bottom: 6px; }
+.r-text sup, .r-auth sup, .r-aff sup { font-size: .7em; line-height: 0; }
+.r-foot { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.r-src { font-size: 12px; color: var(--faint); margin-top: 14px; }
+body.locked { overflow: hidden; }
+
 footer { color: var(--faint); font-size: 12.5px; padding: 20px 0 40px; border-top: 1px solid var(--line); }
 .totop { position: fixed; right: 14px; bottom: calc(16px + env(safe-area-inset-bottom)); width: 44px; height: 44px; border-radius: 22px; border: 1px solid var(--line); background: var(--surface); box-shadow: 0 2px 8px rgba(0,0,0,.12); font-size: 18px; cursor: pointer; }
 </style>
@@ -244,8 +281,11 @@ function links(ls) {
   return '<div class="links">' + ls.map(l => {
     if (l.ok === false) return `<span class="lk bad" title="${esc(l.src || l.url)}">${l.label === "Abstract" ? "초록" : esc(l.label)}: 원문 링크 오류</span>`;
     const pdf = (l.type || "").includes("pdf");
-    const label = l.label === "Abstract" ? "초록" : l.label;
-    return `<a class="lk${pdf ? " pdf" : ""}" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(label)}</a>`;
+    if (pdf && l.label === "Abstract") {   // abstract: open the in-page reader; the original PDF stays one tap away
+      return `<a class="lk abs" href="${esc(l.url)}" data-abs="${esc(l.url)}" role="button">초록 보기</a>` +
+             `<a class="lk pdf small" href="${esc(l.url)}" target="_blank" rel="noopener">원문</a>`;
+    }
+    return `<a class="lk${pdf ? " pdf" : ""}" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`;
   }).join("") + "</div>";
 }
 const starBtn = key => `<button class="star" data-star="${key}" aria-pressed="${stars.has(key)}" aria-label="관심 발표 담기">${STAR_SVG}</button>`;
@@ -313,11 +353,11 @@ function renderMine() {
 }
 function renderSearch() {
   const words = norm(query).split(/\s+/).filter(Boolean);
-  const hit = x => words.every(w => x.hay.includes(w));
+  const hit = x => words.every(w => x.hay.includes(w) || (x.habs || "").includes(w));
   const talks = ITEMS.filter(x => hit(x));
   const sessHit = DATA.sessions.filter(s => s.items.length === 0 && words.every(w => s.hay.includes(w)));
   if (!talks.length && !sessHit.length) return `<div class="empty">'${esc(query)}' 에 맞는 발표가 없습니다.</div>`;
-  let html = `<p class="note">검색 결과 ${talks.length + sessHit.length} 건 (모든 날짜 · 포스터 · 전시)</p>`;
+  let html = `<p class="note">검색 결과 ${talks.length + sessHit.length} 건 (모든 날짜 · 포스터 · 전시${ABS ? " · 초록 본문" : ""})</p>`;
   DAYS.forEach(([d]) => {
     const t = talks.filter(x => x.kind === "talk" && x.s.date === d);
     const ss = sessHit.filter(s => s.date === d);
@@ -368,6 +408,8 @@ document.getElementById("q").addEventListener("input", e => { clearTimeout(tmr);
 document.getElementById("clear").addEventListener("click", () => { query = ""; document.getElementById("q").value = ""; syncUrl(); render(); });
 document.querySelector(".seg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; tz = b.dataset.tz; store.set("vhroda26-tz", tz); render(true); });
 document.getElementById("main").addEventListener("click", e => {
+  const ab = e.target.closest("[data-abs]");
+  if (ab) { e.preventDefault(); openReader(ab.dataset.abs); return; }
   const st = e.target.closest(".star");
   if (st) {
     const k = st.dataset.star;
@@ -387,6 +429,97 @@ document.getElementById("main").addEventListener("click", e => {
 const totop = document.getElementById("totop");
 window.addEventListener("scroll", () => { totop.hidden = window.scrollY < 600; }, {passive: true});
 totop.addEventListener("click", () => window.scrollTo({top: 0, behavior: "smooth"}));
+// ---------- abstracts: loaded after first paint, kept by the service worker for offline use ----------
+let ABS = null, absLoading = null;
+const BY_URL = {};   // abstract url -> {it, s}
+ITEMS.forEach(x => (x.it.links || []).forEach(l => { if (!BY_URL[l.url]) BY_URL[l.url] = x; }));
+function loadAbs() {
+  if (!absLoading) absLoading = fetch("abstracts.json?v=ddc9ac69").then(r => r.json()).then(j => {
+    ABS = j;
+    ITEMS.forEach(x => {   // search also looks inside abstract text
+      const a = (x.it.links || []).map(l => j[l.url]).find(Boolean);
+      x.habs = a ? norm([a.pt, a.a, a.f].concat(a.b.map(b => b[1])).join(" ").replace(/<[^>]+>/g, " ")) : "";
+    });
+    if (query) render(true);
+  }).catch(() => { absLoading = null; });
+  return absLoading;
+}
+(window.requestIdleCallback || (f => setTimeout(f, 800)))(() => loadAbs());
+if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+
+const reader = document.createElement("div");
+reader.className = "reader"; reader.hidden = true;
+reader.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="초록">
+  <div class="r-top"><button class="ib" data-r="close" aria-label="닫기">✕</button><span class="grow"></span>
+    <button class="ib" data-r="prev" aria-label="이전 초록">‹</button><span class="r-pos"></span><button class="ib" data-r="next" aria-label="다음 초록">›</button>
+    <button class="star" data-r="star" aria-label="관심 발표 담기">${STAR_SVG}</button></div>
+  <div class="r-body"></div></div>`;
+document.body.appendChild(reader);
+let seq = [], cur = -1;
+async function openReader(url, push = true) {
+  seq = [...new Set([...document.querySelectorAll("#main [data-abs]")].map(a => a.dataset.abs))];
+  cur = seq.indexOf(url);
+  if (push && reader.hidden) history.pushState({reader: 1}, "");
+  reader.hidden = false; document.body.classList.add("locked");
+  await showAbs(url);
+}
+async function showAbs(url) {
+  const x = BY_URL[url], body = reader.querySelector(".r-body");
+  if (!ABS) { body.innerHTML = '<p class="note">초록을 불러오는 중입니다.</p>'; await loadAbs(); }
+  const a = ABS && ABS[url], it = x.it, s = x.s;
+  const meta = s ? `${dayLabel(s.date)} ${range(it.s || s.s, it.e || s.e, s.date)} · ${esc(s.name)}` : `Poster ${it.no} · ${esc(it.theme || "")}`;
+  let txt = "", inList = false;
+  (a ? a.b : []).forEach(([t, h]) => {
+    if (t === "li" && !inList) { txt += "<ul>"; inList = true; }
+    if (t !== "li" && inList) { txt += "</ul>"; inList = false; }
+    txt += t === "li" ? `<li>${h}</li>` : t === "h" ? `<h4>${h}</h4>` : `<p>${h}</p>`;
+  });
+  if (inList) txt += "</ul>";
+  body.innerHTML = `<div class="r-meta">${meta}</div><h2 class="r-title">${esc(it.title)}</h2>
+    ${a && a.pt ? `<div class="r-pt">PDF 제목: ${a.pt}</div>` : ""}
+    <div class="r-auth">${a && a.a ? a.a : esc(it.who)}</div>${a && a.f ? `<div class="r-aff">${a.f}</div>` : ""}
+    <div class="r-text">${a ? txt : '<p class="note">초록을 불러오지 못했습니다. 아래 원문 PDF 를 여세요.</p>'}</div>
+    <div class="r-foot"><a class="lk pdf" href="${esc(url)}" target="_blank" rel="noopener">원문 PDF</a></div>
+    <div class="r-src">ESA 가 공개한 초록 PDF 에서 글을 옮겼습니다. 수식 · 기호 · 표는 원문 PDF 로 확인하세요.</div>`;
+  body.scrollTop = 0;
+  reader.querySelector('[data-r="prev"]').disabled = cur <= 0;
+  reader.querySelector('[data-r="next"]').disabled = cur < 0 || cur >= seq.length - 1;
+  reader.querySelector(".r-pos").textContent = cur >= 0 ? `${cur + 1}/${seq.length}` : "";
+  const sb = reader.querySelector('[data-r="star"]');
+  sb.dataset.key = it.key; sb.setAttribute("aria-pressed", stars.has(it.key));
+}
+function closeReader(fromPop) {
+  if (reader.hidden) return;
+  reader.hidden = true; document.body.classList.remove("locked");
+  if (!fromPop && history.state && history.state.reader) history.back();
+}
+function step(d) { if (cur + d >= 0 && cur + d < seq.length) { cur += d; showAbs(seq[cur]); } }
+reader.addEventListener("click", e => {
+  if (e.target === reader) return closeReader();
+  const b = e.target.closest("[data-r]"); if (!b) return;
+  const r = b.dataset.r;
+  if (r === "close") closeReader();
+  else if (r === "prev") step(-1);
+  else if (r === "next") step(1);
+  else if (r === "star") {
+    const k = b.dataset.key; stars.has(k) ? stars.delete(k) : stars.add(k);
+    store.set("vhroda26-stars", [...stars]); b.setAttribute("aria-pressed", stars.has(k)); render(true);
+  }
+});
+window.addEventListener("popstate", () => closeReader(true));   // phone back button closes the reader
+document.addEventListener("keydown", e => {
+  if (reader.hidden) return;
+  if (e.key === "Escape") closeReader(); else if (e.key === "ArrowLeft") step(-1); else if (e.key === "ArrowRight") step(1);
+});
+// swipe left / right in the reader
+let tx = null, ty = null;
+reader.addEventListener("touchstart", e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, {passive: true});
+reader.addEventListener("touchend", e => {
+  if (tx === null) return;
+  const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty; tx = null;
+  if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 2) step(dx < 0 ? 1 : -1);
+}, {passive: true});
+
 // ---------- theme: auto (follow the phone) -> light -> dark ----------
 const THEMES = {auto: ["◐", "자동"], light: ["☀", "밝게"], dark: ["☾", "어둡게"]};
 let theme = store.get("vhroda26-theme", "auto");
