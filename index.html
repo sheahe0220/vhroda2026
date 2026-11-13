@@ -40,7 +40,13 @@ button, input { font: inherit; color: inherit; }
 a { color: var(--accent); }
 .wrap { max-width: 1320px; margin: 0 auto; padding: 0 16px; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
 
-header.top { padding: 18px 0 6px; }
+header.top { padding: 18px 0 6px; position: relative; }
+header.top h1 { padding-right: 96px; }
+.themebtn {
+  position: absolute; right: 0; top: 14px; height: 36px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--line);
+  background: var(--surface); font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+}
+.themebtn span { font-size: 15px; line-height: 1; }
 header.top h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
 header.top .sub { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
 header.top .src { margin: 6px 0 0; color: var(--faint); font-size: 12.5px; }
@@ -144,6 +150,7 @@ footer { color: var(--faint); font-size: 12.5px; padding: 20px 0 40px; border-to
 <div class="wrap">
   <header class="top">
     <h1>VH-RODA 2026 프로그램</h1>
+    <button class="themebtn" id="themebtn" aria-label="화면 밝기 바꾸기"></button>
     <p class="sub">16-20 November 2026 · ESA-ESRIN, Frascati, Italy</p>
     <p class="src">ESA 공식 agenda 를 휴대폰에서 보기 쉽게 정리한 비공식 페이지입니다. 변경 사항은 <a href="https://earth.esa.int/eogateway/events/vh-roda/agenda" target="_blank" rel="noopener">ESA 원문</a>을 확인하세요. 기준 2026-11-13.</p>
   </header>
@@ -380,6 +387,21 @@ document.getElementById("main").addEventListener("click", e => {
 const totop = document.getElementById("totop");
 window.addEventListener("scroll", () => { totop.hidden = window.scrollY < 600; }, {passive: true});
 totop.addEventListener("click", () => window.scrollTo({top: 0, behavior: "smooth"}));
+// ---------- theme: auto (follow the phone) -> light -> dark ----------
+const THEMES = {auto: ["◐", "자동"], light: ["☀", "밝게"], dark: ["☾", "어둡게"]};
+let theme = store.get("vhroda26-theme", "auto");
+function applyTheme() {
+  const root = document.documentElement;
+  if (theme === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", theme);
+  const dark = theme === "dark" || (theme === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.removeAttribute("media"); m.content = dark ? "#111317" : "#f6f7f9"; });
+  document.getElementById("themebtn").innerHTML = `<span aria-hidden="true">${THEMES[theme][0]}</span>${THEMES[theme][1]}`;
+}
+document.getElementById("themebtn").addEventListener("click", () => {
+  theme = {auto: "light", light: "dark", dark: "auto"}[theme]; store.set("vhroda26-theme", theme); applyTheme();
+});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+applyTheme();
 document.getElementById("q").value = query;
 render();
 setInterval(() => { if (!query && DAYS.some(d => d[0] === view)) render(true); }, 60000);
