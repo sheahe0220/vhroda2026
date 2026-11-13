@@ -38,7 +38,7 @@ body {
 }
 button, input { font: inherit; color: inherit; }
 a { color: var(--accent); }
-.wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 0 16px; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
 
 header.top { padding: 18px 0 6px; }
 header.top h1 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
@@ -72,8 +72,27 @@ header.top .src { margin: 6px 0 0; color: var(--faint); font-size: 12.5px; }
 main { padding: 6px 0 80px; }
 .note { color: var(--muted); font-size: 13.5px; margin: 12px 0 0; }
 .dayhead { font-size: 17px; margin: 22px 0 8px; }
-.list { display: grid; grid-template-columns: 1fr; gap: 10px; }
-@media (min-width: 760px) { .list.two { grid-template-columns: 1fr 1fr; align-items: start; } }
+.list { display: grid; grid-template-columns: 1fr; gap: 10px; align-items: start; }
+.list .brk { grid-column: 1 / -1; }
+.cols > .block { break-inside: avoid; margin-bottom: 4px; }
+.cols.day > .block { margin-bottom: 10px; }
+.cols.day > .block > .brk { padding: 0 4px; }
+/* foldables unfolded, small tablets, landscape phones */
+@media (min-width: 640px) {
+  .list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .cols { column-count: 2; column-gap: 12px; }
+  .wrap { padding: 0 20px; }
+}
+/* large tablets, laptops */
+@media (min-width: 1100px) {
+  .list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cols { column-count: 3; }
+}
+/* very short landscape screens: keep the sticky bar small */
+@media (max-height: 480px) and (orientation: landscape) {
+  header.top .src { display: none; }
+  .tab small { display: none; }
+}
 
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
 .card.now { border-color: var(--now); }
@@ -251,15 +270,16 @@ function renderDay(date) {
   const rows = ss.map(s => ({t: toMin(s.s), html: sessionCard(s, true)}))
     .concat(br.map(b => ({t: toMin(b.s) + 0.5, html: `<div class="brk"><b>${range(b.s, b.e, date)}</b><span>${esc(b.text)}</span></div>`})))
     .sort((a, b) => a.t - b.t);
-  return `<div class="list">${rows.map(r => r.html).join("")}</div>`;
+  // single-track day: newspaper columns on wide screens (read down, then across), one column on phones
+  return `<div class="cols day">${rows.map(r => `<div class="block">${r.html}</div>`).join("")}</div>`;
 }
 function renderPosters() {
   const by = {};
   DATA.posters.forEach(p => (by[p.theme] = by[p.theme] || []).push(p));
   const sched = DATA.sessions.filter(s => /poster/i.test(s.name)).map(s => `${dayLabel(s.date)} ${range(s.s, s.e, s.date)}`).join(" · ");
-  return `<p class="note">포스터 ${DATA.posters.length} 편. 포스터 세션: ${sched}</p>` +
-    Object.entries(by).map(([th, ps]) => `<h3 class="theme">${esc(th)} (${ps.length})</h3>
-      <div class="card"><ul class="items">${ps.map(p => itemRow(p, "")).join("")}</ul></div>`).join("");
+  return `<p class="note">포스터 ${DATA.posters.length} 편. 포스터 세션: ${sched}</p><div class="cols">` +
+    Object.entries(by).map(([th, ps]) => `<div class="block"><h3 class="theme">${esc(th)} (${ps.length})</h3>
+      <div class="card"><ul class="items">${ps.map(p => itemRow(p, "")).join("")}</ul></div></div>`).join("") + "</div>";
 }
 function renderVendors() {
   return `<p class="note">전시 ${DATA.vendors.length} 곳</p><div class="card"><ul class="items">${DATA.vendors.map(v => itemRow(v, "")).join("")}</ul></div>`;
