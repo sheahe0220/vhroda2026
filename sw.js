@@ -1,6 +1,6 @@
 // Offline cache for the program page: serve from cache at once, refresh in the background.
-const CACHE = "vhroda26-d7ff5f83";
-const FILES = ["./", "./index.html", "./abstracts.json"];
+const CACHE = "vhroda26-b849761c";
+const FILES = ["./", "./index.html", "./abstracts.json", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
